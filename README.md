@@ -9,7 +9,11 @@ temple. The four-armed goddess awakens from meditation, raises her khadga
 |---|---|---|---|
 | ![](docs/still-0.3.png) | ![](docs/still-2.2.png) | ![](docs/still-3.4.png) | ![](docs/still-5.png) |
 
-*(Stills rendered headlessly with a software WebGL renderer. Frame rate on real iPhones has not been measured yet.)*
+| Face close-up | Hair from behind |
+|---|---|
+| ![](docs/closeup-face.png) | ![](docs/closeup-hair.png) |
+
+*(Stills rendered headlessly with a software WebGL renderer. Frame rate on real iPhones has not been measured yet; the canvas lowers its resolution automatically if frames start dropping.)*
 
 ## Run it
 
