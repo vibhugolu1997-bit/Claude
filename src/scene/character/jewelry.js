@@ -262,12 +262,18 @@ export function buildNecklaces(shape, neckBaseY, mats) {
   drop.position.y = -0.034
   med.add(drop)
   g.add(med)
-  // choker hugging the neck
-  const choker = bodyRing(shape, neckBaseY + 0.03, -Math.PI, Math.PI, 64, 0.002)
-  g.add(new THREE.Mesh(bandGeometry(choker.pts, choker.nrm, 0.012, 0.003, true), mats.gold))
-  const cg = []
-  choker.pts.forEach((p, i) => i % 3 === 0 && Math.abs((i / 63) * 2 - 1) < 0.5 && cg.push(M(p.clone().addScaledVector(choker.nrm[i], 0.006).setY(p.y + 0.008), 0.0035)))
-  g.add(placeInstances(gemGeo, mats.ruby, cg))
+  g.traverse((o) => o.isMesh && (o.castShadow = true))
+  return g
+}
+
+// Choker: a slim jewelled band fitted to the neck at the given height.
+export function buildChoker(shape, y, mats) {
+  const g = new THREE.Group()
+  const ring = bodyRing(shape, y, -Math.PI, Math.PI, 64, 0.001)
+  g.add(new THREE.Mesh(bandGeometry(ring.pts, ring.nrm, 0.011, 0.003, true), mats.gold))
+  const gems = []
+  ring.pts.forEach((p, i) => i % 3 === 0 && Math.abs((i / 63) * 2 - 1) < 0.45 && gems.push(M(p.clone().addScaledVector(ring.nrm[i], 0.0045).setY(p.y + 0.0055), 0.003)))
+  g.add(placeInstances(gemGeo, mats.ruby, gems))
   g.traverse((o) => o.isMesh && (o.castShadow = true))
   return g
 }

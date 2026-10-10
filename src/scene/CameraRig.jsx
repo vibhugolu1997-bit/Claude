@@ -6,7 +6,9 @@ import { timeline, smoother, DURATION } from '../lib/timeline.js'
 // Debug framings: ?cam=face|torso|full|side|back
 const debugCam = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('cam') : null
 const DEBUG = {
-  face: [[0, 1.78, 0.9], [0, 1.74, 0]],
+  face: [[0, 1.8, 0.62], [0, 1.77, 0]],
+  portrait: [[-0.36, 1.8, 0.52], [0, 1.77, 0.02]],
+  hair: [[0.9, 1.75, -1.3], [0, 1.6, 0]],
   full: [[0, 1.2, 4.6], [0, 1.1, 0]],
   torso: [[0, 1.55, 2.2], [0, 1.4, 0]],
   side: [[2.4, 1.5, 0.8], [0, 1.35, 0]],

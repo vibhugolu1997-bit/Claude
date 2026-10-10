@@ -48,11 +48,13 @@ The rule for this project was *no character built from visible spheres, cones an
 | Part | How it's made |
 |---|---|
 | Body, face, hands, rig | **Microsoft Rocketbox `Female_Adult_03`**, a professionally scanned and textured, fully rigged human (3ds Max Biped skeleton with facial bones). MIT licence. Downloaded from [github.com/microsoft/Microsoft-Rocketbox](https://github.com/microsoft/Microsoft-Rocketbox) and converted FBX → GLB with FBX2glTF. |
-| Midnight-blue skin | `scripts/process_textures.py` re-maps the photographic skin texture onto a midnight-blue ramp and keeps its luminance detail (pores, creases, shading). The material is PBR (`MeshPhysicalMaterial`) with normal + roughness maps, sheen, light clear-coat and a wrap/rim term that approximates subsurface scattering. |
+| Smooth silhouette | `subdivide.js` runs one level of skin-weight-aware Loop subdivision on the head and body at load time (×4 triangles). This removes the faceted jaw, cheek and shoulder outline of the game mesh while keeping UV seams, the neck seam and the eyeballs intact. |
+| Midnight-blue skin | `scripts/process_textures.py` re-maps the photographic skin texture onto a midnight-blue ramp and keeps its luminance detail (pores, creases, shading). The scan's own blood-flush variation becomes a violet flush on cheeks, nose and ears. The material is PBR (`MeshPhysicalMaterial`) with: per-channel wrapped diffuse (light bleeds softly past the shadow edge, approximating subsurface scattering); a tiling pore/crease detail normal; and a skin-only oily clear-coat as the second specular lobe. |
+| Eyes | A fitted cornea shell over each eyeball adds wet catch-lights that move with the gaze. The texture adds eye occlusion toward the lids and a dark limbal ring around the iris. |
 | Four arms | `extraArms.js` duplicates the character's own arm triangles, keeping their UVs, normals and textures, and re-skins them to a cloned bone chain. Shoulder vertices keep their partial clavicle/spine weights, so each extra arm blends into the torso like a joint. All four arms run their own analytic two-bone IK, hand orientation (palm + finger direction) and per-joint finger curls. |
-| Face | Eyelid blink bones open the eyes. Kohl, plum lips and a red tilak are painted into the texture. |
+| Face | Eyelid blink bones open the eyes. Kohl, plum lips and a red tilak are painted into the texture. A soft portrait key light sits under the crown's shadow. |
 | Lehenga | A floor-length pleated skirt fitted to the measured hips (`bodyShape.js`), with animated folds. The silk/zari texture is painted procedurally, with metallic gold borders. |
-| Hair | 110 verlet-simulated strands rooted on the measured scalp. They collide with the head and back, react to a breeze, and render as alpha strand cards. The model's own shoulder-length hair stays underneath. |
+| Hair | Strand-based hair. 120 verlet-simulated guide curves are rooted on the measured scalp beneath the crown; they collide with the head and back and react to a breeze. From them the GPU generates ~4,300 individual fibres, each blending two neighbouring guides, fanning toward the tip and waving on its own. The fibres are about 1 mm wide, anti-aliased with alpha-to-coverage, and shaded with a two-lobe Kajiya–Kay hair model (sharp white highlight plus a broader tinted one), back-light glow and self-occlusion. A sparse layer of dark cards gives the mass its body. The original game haircut was removed; its eyelashes were kept. |
 | Jewellery | Mukut crown (three tiers of filigree spires, rubies, emeralds, pearls, crescent moon), jhumkas, nath, four necklace strands with a medallion, choker, bajubands and bangles on all four arms, and kamarbandh. Also the khadga and kapala bowl. All are modelled from extruded/lathed profiles with PBR gold, gem and steel materials, fitted to the measured body and parented to bones. |
 | Temple | Fluted lathe pillars, lotus dais, gold prabhavali with a ring of shader flames, brass lamp stands, rows of diyas, a light shaft, dust motes and embers. Uses ACES tone mapping, mild bloom and a vignette. |
 
@@ -65,10 +67,9 @@ Everything here was built from assets that could actually be downloaded and
 licensed. Sketchfab, Poly Haven and similar hubs weren't reachable from the
 build environment. Within that:
 
-* **The base mesh is game-quality.** It has about 3.7k vertices and 2K textures. This was
-  state-of-the-art real-time crowd CGI in its day, but it is not a film-grade digital
-  human (MetaHuman-style 100k+ vertex faces, strand hair, multi-layer skin
-  scattering). Up close you can see polygon edges at the silhouette, and the
+* **The base mesh is game-quality.** It has about 3.7k vertices and 2K textures. Subdivision
+  smooths its outline, but it can't add detail the scan never had. It is not a film-grade
+  digital human (MetaHuman-style 100k+ vertex faces, multi-layer skin scattering), and the
   face can't do detailed expressions (it has jaw/eyelid/brow bones, no blend-shape FACS rig).
 * **The face is a scanned non-Indian base.** No freely licensed, rigged *Indian*
   female head was available. The proportions are adult and realistic, and the
@@ -79,7 +80,7 @@ build environment. Within that:
 * **Garments and jewellery are procedural.** They're fitted to the body and
   detailed, but they're not cloth-simulated or sculpted assets. The original
   tunic is re-textured as a crimson-and-gold choli.
-* **Hair is card-based**, not strand-rendered. It moves convincingly but it's flat up close.
+* **Hair is a few thousand fibres**, not the ~100k of a real head, with no strand-to-strand shadows. It reads as hair at portrait distance, but it is thinner than a film groom.
 * **Mahakali's tongue and the garland of heads are not depicted.** The rig has no
   tongue blend-shape, and a primitive-built garland would break the no-primitives rule.
 
@@ -109,7 +110,10 @@ src/
     choreography.js          key poses (dormant → divine) and timing
     bodyShape.js             measures the body to fit garments / hair
     jewelry.js, adorn.js     ornaments + props and their bone attachment
-    Lehenga.jsx, Hair.jsx    animated skirt and simulated hair
+    Lehenga.jsx              animated skirt
+    Hair.jsx                 guide simulation + GPU strand hair shader
+    subdivide.js             skin-aware Loop subdivision
+    eyes.js                  cornea shells, lash-only card filter
 scripts/
   build-assets.sh            fetch + convert Rocketbox, recolour textures
   process_textures.py        skin / cloth / eye texture processing

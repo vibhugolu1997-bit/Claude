@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview --host",
-    "build:assets": "bash scripts/build-assets.sh"
+    "build:assets": "bash scripts/build-assets.sh",
+    "build:embedded": "node scripts/glb-to-gltf.mjs public/assets/mahakali/body.glb public/assets/mahakali/body.gltf.json && VITE_BODY_MODEL=body.gltf.json vite build --outDir dist-embedded"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

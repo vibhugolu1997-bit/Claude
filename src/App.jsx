@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { useProgress } from '@react-three/drei'
+import { PerformanceMonitor, useProgress } from '@react-three/drei'
 import * as THREE from 'three'
 import Experience from './scene/Experience.jsx'
 import { timeline, DURATION } from './lib/timeline.js'
@@ -48,6 +48,8 @@ export default function App() {
   const canvasRef = useRef()
   const [recording, setRecording] = useState(false)
   const [video, setVideo] = useState(null)
+  // start sharp (up to 2× on retina phones) and step down if frames start dropping
+  const [dpr, setDpr] = useState(() => Math.min(2, window.devicePixelRatio || 1))
   const canRecord = recordingSupported()
 
   const onRecord = useCallback(async () => {
@@ -91,7 +93,7 @@ export default function App() {
     <div className="app">
       <Canvas
         className="stage"
-        dpr={[1, 2]}
+        dpr={dpr}
         shadows
         gl={{
           antialias: true,
@@ -103,6 +105,11 @@ export default function App() {
         camera={{ fov: 32, near: 0.05, far: 80, position: [0, 1.6, 6] }}
         onCreated={({ gl }) => (canvasRef.current = gl.domElement)}
       >
+        <PerformanceMonitor
+          flipflops={3}
+          onDecline={() => setDpr((d) => Math.max(1, +(d - 0.35).toFixed(2)))}
+          onIncline={() => setDpr((d) => Math.min(2, window.devicePixelRatio || 1, +(d + 0.25).toFixed(2)))}
+        />
         <Suspense fallback={null}>
           <Experience />
         </Suspense>

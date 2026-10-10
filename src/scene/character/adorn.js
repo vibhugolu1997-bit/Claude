@@ -1,6 +1,7 @@
 import * as THREE from 'three'
+import { BodyShape } from './bodyShape.js'
 import {
-  jewelryMaterials, buildCrown, buildJhumka, buildNecklaces, measureLimb,
+  jewelryMaterials, buildCrown, buildJhumka, buildNecklaces, buildChoker, measureLimb,
   buildArmband, buildBangles, buildWaistBelt, buildKhadga, buildBowl,
 } from './jewelry.js'
 
@@ -39,9 +40,12 @@ export function adorn(c, waistY) {
   nath.rotation.set(0, Math.PI / 2 - 0.3, 0)
   head.attach(nath)
 
-  // necklaces on the chest, choker on the neck
+  // necklaces on the chest, choker on the neck (it follows the neck, not the chest)
   const necks = buildNecklaces(shape, neck.y + 0.0, mats)
   rig.get('Bip01 Spine2').attach(necks)
+  // measure the bare neck only (ignore hair and jaw bound to the head bone)
+  const neckShape = new BodyShape(root, [c.headMesh, body], (b) => !/Neck|Spine2|Clavicle/.test(b?.name || ''))
+  rig.get('Bip01 Neck').attach(buildChoker(neckShape, neck.y + 0.03, mats))
 
   // waist belt over the lehenga
   const belt = buildWaistBelt(shape, waistY - 0.012, mats)

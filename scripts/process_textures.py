@@ -60,10 +60,23 @@ def skin_mask(rgb):
 def luminance(rgb):
     return rgb @ np.array([0.2126, 0.7152, 0.0722], np.float32)
 
+# The scan's own blood/flush variation (how much redder than average a pixel
+# is) becomes a violet flush on cheeks, nose, ears and knuckles, and a cooler
+# slate tone where the skin was sallow. This keeps the face from reading as a
+# flat, single-hue paint job.
+SKIN_REF_RED = 0.31  # median redness of the source scan's skin
+
 def recolor_skin(rgb, mask):
     lum = luminance(rgb)
     # one shared reference so head and body textures match at the neck seam
     blue = skin_ramp(lum / SKIN_REF_LUM)
+    redness = (rgb[..., 0] - rgb[..., 1]) / (rgb[..., 0] + 1e-3)
+    flush = np.clip((redness - SKIN_REF_RED) / 0.06, -1, 1)
+    flush = blur_mask((flush * 0.5 + 0.5).astype(np.float32), 3.0) * 2 - 1
+    violet = blue * np.array([1.45, 0.86, 1.08], np.float32)
+    slate = blue * np.array([0.86, 1.02, 1.08], np.float32)
+    f = flush[..., None]
+    blue = np.where(f > 0, blue + (violet - blue) * f * 0.75, blue + (slate - blue) * (-f) * 0.5)
     m = blur_mask(mask, 1.5)[..., None]
     return rgb * (1 - m) + blue * m, m[..., 0]
 
@@ -99,11 +112,19 @@ tilak = (np.abs(x - 0.5) < half_w) & (ty > 0) & (ty < 1)
 tm = blur_mask(tilak.astype(np.float32), 1.0)[..., None] * 0.9
 head_out = head_out * (1 - tm) + srgb("#9e0f18") * tm
 # eyes: deepen the iris (dark brown-black) and soften the sclera
-er = np.sqrt((x - 0.265) ** 2 + (y - 0.925) ** 2)
-iris = blur_mask((er < 0.021).astype(np.float32), 2)[..., None]
-head_out = head_out * (1 - iris * 0.55)
-sclera = blur_mask(((er >= 0.021) & (er < 0.06)).astype(np.float32), 3)[..., None]
+IRIS_C, IRIS_R = (0.2637, 0.9331), 0.0172   # measured on the source eyeball texture
+er = np.sqrt((x - IRIS_C[0]) ** 2 + (y - IRIS_C[1]) ** 2)
+iris = blur_mask((er < IRIS_R).astype(np.float32), 2)[..., None]
+head_out = head_out * (1 - iris * 0.45)
+sclera = blur_mask(((er >= IRIS_R) & (er < 0.06)).astype(np.float32), 3)[..., None]
 head_out = head_out * (1 - sclera * 0.18)
+# eye occlusion: the sclera darkens toward the lids and corners, never paper-white
+ao = np.clip((er - 0.03) / 0.035, 0, 1) ** 1.5
+eye_island = (er < 0.07)[..., None]
+head_out = np.where(eye_island, head_out * (1 - 0.5 * ao[..., None]) * np.array([0.92, 0.9, 0.93], np.float32), head_out)
+# limbal ring: a thin dark ring at the iris edge gives the eye depth
+limbal = blur_mask((np.abs(er - IRIS_R) < 0.002).astype(np.float32), 1.2)[..., None]
+head_out = head_out * (1 - limbal * 0.6)
 
 # hair: neutral blue-black instead of brown
 hair = (v < 0.3) & (mask < 0.5) & ~mouth_eye_atlas
@@ -157,7 +178,7 @@ dm = blur_mask(dark.astype(np.float32), 1.0)[..., None]
 body_out = body_out * (1 - dm) + (srgb("#24040a") * np.clip(lum / 0.12, 0.3, 1.6)) * dm
 save(body_out, "body_color")
 
-# gold metalness mask for the tunic brocade (R=unused, G=roughness, B=metalness)
+# R = skin mask (drives the oily clear-coat layer and pore detail), G = roughness, B = metalness
 for part, src_rgb, skin_m, cloth_gold in (("head", head, m, None), ("body", body, bm, gold_m[..., 0] * pm[..., 0])):
     spec = luminance(load(f"{part}_specular"))
     rough = np.clip(0.72 - spec * 1.4, 0.45, 0.9)             # skin: soft sheen with oilier T-zone
@@ -166,7 +187,11 @@ for part, src_rgb, skin_m, cloth_gold in (("head", head, m, None), ("body", body
     if cloth_gold is not None:
         rough = rough * (1 - cloth_gold) + 0.35 * cloth_gold
         metal = cloth_gold * 0.9
-    orm = np.stack([np.ones_like(rough), rough, metal], -1)
+    coat = np.clip(skin_m, 0, 1)
+    if part == "head":
+        coat = np.maximum(coat, lip_m[..., 0] * 1.0)               # lips are glossier
+        rough = rough * (1 - lip_m[..., 0] * 0.4)
+    orm = np.stack([coat, rough, metal], -1)
     save(orm, f"{part}_orm", quality=90)
     nrm = load(f"{part}_normal")
     save(nrm, f"{part}_normal", quality=92)

@@ -11,6 +11,8 @@ import { Hair } from './Hair.jsx'
 import { Lehenga, WAIST_Y } from './Lehenga.jsx'
 import { adorn } from './adorn.js'
 import { BodyShape } from './bodyShape.js'
+import { loopSubdivideSkinned } from './subdivide.js'
+import { buildCorneas, faceFeatureTest, keepOnlyLashes } from './eyes.js'
 
 // VITE_BODY_MODEL lets hosts that can't serve .glb use an embedded .gltf JSON instead
 const URL_ = `${import.meta.env.BASE_URL}assets/mahakali/${import.meta.env.VITE_BODY_MODEL || 'body.glb'}`
@@ -23,7 +25,7 @@ function buildCharacter(gltf) {
   if (root.userData.built) return root.userData.built
 
   const mats = createMaterials(new THREE.TextureLoader())
-  let body = null, headMesh = null
+  let body = null, headMesh = null, cards = null
   root.traverse((o) => {
     if (!o.isSkinnedMesh) return
     o.castShadow = true
@@ -36,9 +38,23 @@ function buildCharacter(gltf) {
     } else if (n.includes('head')) {
       o.material = mats.head
       headMesh = o
+    } else {
+      o.material = mats.hairCards
+      cards = o
     }
-    else o.material = mats.hairCards
   })
+
+  // Smooth the game-resolution silhouette (jaw, cheeks, nose, neck, shoulders,
+  // arms) with one level of skin-aware subdivision, before anything is fitted
+  // to the surface. Eyeballs and lips are pinned so they keep their shape.
+  root.updateMatrixWorld(true)
+  headMesh.geometry = loopSubdivideSkinned(headMesh.geometry, { isFixed: faceFeatureTest(headMesh), vertexBlend: 0.7 })
+  body.geometry = loopSubdivideSkinned(body.geometry, { vertexBlend: 0.85 })
+
+  // wet, glossy corneas over the eyes; keep only the eyelashes from the card mesh
+  buildCorneas(root, headMesh, mats.cornea)
+  const eyeCenters = ['Bip01_LEye', 'Bip01_REye'].map((n) => headMesh.skeleton.getBoneByName(n).getWorldPosition(new THREE.Vector3()))
+  if (cards) keepOnlyLashes(cards, eyeCenters)
 
   // measure the rest-pose torso (arms excluded) for fitting garments & hair
   const isArm = (b) => /UpperArm|Forearm|Hand|Finger/.test(b?.name || '')
@@ -78,7 +94,7 @@ function buildCharacter(gltf) {
   return built
 }
 
-export default function Mahakali(props) {
+export default function Mahakali({ lights, ...props }) {
   const gltf = useLoader(GLTFLoader, URL_)
   const c = useMemo(() => buildCharacter(gltf), [gltf])
   const group = useRef()
@@ -118,7 +134,7 @@ export default function Mahakali(props) {
   return (
     <group ref={group} {...props}>
       <primitive object={c.root} />
-      <Hair character={c} />
+      <Hair character={c} lights={lights} />
       <Lehenga character={c} />
     </group>
   )
